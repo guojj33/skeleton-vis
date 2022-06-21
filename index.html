@@ -1,0 +1,394 @@
+<html>
+	<head>
+        <script src = "./lib/jquery.js"></script>
+        <script src = "./lib/d3.min.js"></script>
+        <script src = "./lib/paper-full.js "></script>
+        <script src = "./lib/axios.min.js"></script>
+        <script src = "./lib/jquery-3.6.0.min.js"></script>
+        <script src = "./lib/jquery-ui.min.js"></script>
+        <script src = "./lib/numjs.min.js"></script>
+        <script src = "./src/marchingants.js"></script>
+        <link rel="stylesheet" href="./css/jquery-ui.min.css">
+	</head>
+    <style>
+    </style>
+	<body>
+        <div style="position: absolute; right: 0; top: 5; font-size: 14px;">data generated with model <a href="https://gitee.com/yfsong0709/RA-GCNv2">RA-GCNv2</a> testing on <a href="https://rose1.ntu.edu.sg/dataset/actionRecognition/">ntu-rgbd-60</a> dataset</div>
+        <div style="position: absolute; right: 0px; top: 25px; margin: 5px;">
+            <button id="correct-button"></button>
+            <button id="reset-button"></button>
+        </div>
+        <div style="position: absolute; right: 0px; top: 50px; margin: 5px; font-size: 15px;">
+            <div id="slider-label" style="visibility: visible; margin: 10px;">show path larger than <span id="slider-value">0</span></div>
+            <div id="slider" style="width: 200px; visibility: visible;"></div>
+        </div>
+        <div id="rotate-slider" style="height: 400px;
+        position: absolute;
+        left: 65vw;
+        top: 100px;"></div>
+        <div id="gif-container" style="position: absolute; right:0; top: 110px; visibility: hidden;">
+            <div id="s2s-label"></div>
+            <img id="s2s" class="gif" src=""/>
+            <div id="s2t-label"></div>
+            <img id="s2t" class="gif" src=""/>
+            <div id="t2t-label"></div>
+            <img id="t2t" class="gif" src=""/>
+        </div>
+	</body>
+    <style>
+        .gif {
+            height: 28vh;
+            display: block;
+        }
+    </style>
+	<script type="text/javascript">
+        function deepCopy(x) {
+            return JSON.parse(JSON.stringify(x))
+        }
+
+        // let url = 'http://119.91.227.157:7777'
+        function printErr(err) {
+            console.log(err)
+        }
+        // original data
+        var names0 = 0
+        var matrix0 = 0
+        // current show data
+        var names = 0
+        var matrix = 0
+        this.axios.get('/data/classname.json').then(
+            res => {
+                names0 = res.data
+                this.axios.get('/data/conf_mat.json').then(
+                    res => {
+                        matrix0 = res.data
+                        init()
+                        draw()
+                    }
+                ).catch(printErr)
+            }
+        ).catch(printErr)
+
+        // uid.js start
+        var count = 0;
+        function uid(name) {
+            function Id(id) {
+                this.id = id;
+                this.href = new URL(`#${id}`, location) + "";
+            }
+
+            Id.prototype.toString = function() {
+                return "url(" + this.href + ")";
+            };
+            return new Id("O-" + (name == null ? "" : name + "-") + ++count);
+        }
+        // uid.js end
+        
+        // after getting names and matrix
+        function init() {
+            var a = nj.array([[1,2,3],[4,5,6]])
+            console.log(a)
+
+            console.log(names0)
+            console.log(matrix0)
+            names = deepCopy(names0)
+            matrix = deepCopy(matrix0)
+
+            body = document.getElementsByTagName('body')[0]
+
+            // add hide correct button
+            let b = document.getElementById('correct-button')
+            b.innerHTML = 'hide correct'
+            function hideCorrect() {
+                matrix = deepCopy(matrix0)
+                names = deepCopy(names0)
+                for (let i = 0; i < matrix.length; ++i) {
+                    matrix[i][i] = 0
+                }
+            }
+            function showCorrect() {
+                matrix = deepCopy(matrix0)
+                names = deepCopy(names0)
+            }
+            b.addEventListener('click', function() {
+                if (b.innerHTML == 'hide correct') { // do hide correct
+                    hideCorrect()
+                    b.innerHTML = 'show correct'
+                    // $("#slider").css("visibility", "visible")
+                    // $("#slider-label").css("visibility", "visible")
+                    $("#slider").slider("option", "disabled", false)
+                    $("#slider-label").css("opacity", 1.0)
+                    let v = $("#slider").slider("option", "value")
+                    filterWithVAndRedraw(v)
+                    // redraw()
+                }
+                else { // do show correct
+                    showCorrect()
+                    b.innerHTML = 'hide correct'
+                    // $("#slider").css("visibility", "hidden")
+                    // $("#slider-label").css("visibility", "hidden")
+                    $("#slider").slider("option", "disabled", true)
+                    $("#slider-label").css("opacity", 0.5)
+                    redraw()
+                }
+                console.log(matrix)
+            })
+
+            b1 = document.getElementById('reset-button')
+            b1.innerHTML = 'reset'
+            b1.addEventListener('click', function() {
+                redraw()
+            })
+
+            function findMax() {
+                let m = deepCopy(matrix0)
+                for (let i = 0; i < m.length; ++i) {
+                    m[i][i] = 0
+                }
+                let l = []
+                for (let i = 0; i < m.length; ++i) {
+                    l.push(Math.max(...m[i]))
+                }
+                return Math.max(...l)
+            }
+            // add slider
+            let mat_max = findMax()
+            console.log(mat_max)
+            function filterWithVAndRedraw(v) {
+                // let req = new FormData()
+                //     req.append('conf_mat', JSON.stringify(matrix0))
+                //     req.append('classname', JSON.stringify(names0))
+                //     req.append('threshold', v)
+                //     axios.post('/filter', req)
+                //     .then(res => {
+                //         console.log(res)
+                //         matrix = JSON.parse(res.data.conf_mat)
+                //         names = JSON.parse(res.data.classname)
+                //         let del = JSON.parse(res.data.toDelete)//
+                //         console.log('delete', del)//
+                //         console.log('matrix', matrix)
+                //         console.log(names)
+
+                        let matrixT = deepCopy(matrix0)
+                        let namesT = deepCopy(names0)
+                        let cnum = matrixT.length // class num
+                        let nonZeroCount = new Array(cnum).fill(0)
+                        for (let i = 0; i < cnum; ++i) {
+                            matrixT[i][i] = 0;
+                            for (let j = 0; j < cnum; ++j) {
+                                if (matrixT[i][j] < v) {
+                                    matrixT[i][j] = 0
+                                }
+                                else {
+                                    nonZeroCount[i] += 1
+                                    nonZeroCount[j] += 1
+                                }
+                            }
+                        }
+                        let toDelete = []
+                        for (let i = 0; i < cnum; ++i) {
+                            if (nonZeroCount[i] <= 0) {
+                                toDelete.push(i)
+                            }
+                        }
+                        console.log('todelete', toDelete)
+                        // console.log(toDelete.toString() == del.toString()) // true
+                        for (let i = 0; i < cnum; ++i) {
+                            // delete rows
+                            if (toDelete.indexOf(i) != -1) {
+                                delete matrixT[i]
+                                continue
+                            }
+                            // delete cols
+                            for (let j = 0; j < toDelete.length; ++j) {
+                                delete matrixT[i][toDelete[j]]
+                            }
+                            matrixT[i] = matrixT[i].filter(val => val !== undefined) // filter
+                        }
+                        matrixT = matrixT.filter(val => val !== undefined) // filter
+                        console.log('matrixT', matrixT)
+                        // console.log(matrix.toString() == matrixT.toString())
+                        for (let i = 0; i < toDelete.length; ++i) {
+                            delete namesT[toDelete[i]]
+                        }
+                        namesT = namesT.filter(val => val != undefined)
+                        
+                        matrix = matrixT
+                        names = namesT
+
+                        redraw()
+                    // })
+                    // .catch(printErr)
+            }
+            $("#slider").slider({
+                min: 0,
+                max: mat_max,
+                value: 0,
+                // orientation: "vertical",
+                slide: function(e, ui) {
+                    $("#slider-value")[0].innerHTML = ui.value
+                },
+                change: function(e, ui) {
+                    filterWithVAndRedraw(ui.value)
+                }
+            });
+            $("#slider").slider("option", "disabled", true)
+            $("#slider-label").css("opacity", 0.5)
+
+            $("#rotate-slider").slider({
+                min: -360,
+                max: 360,
+                value: 0,
+                orientation: "vertical",
+                slide: function(e, ui) {
+                    console.log('rotate:', ui.value)
+                    svg.attr("transform", "rotate("+ui.value+")")
+                }
+            })
+
+            // svg
+            width = 1000
+            height = width
+
+            innerRadius = Math.min(width, height) * 0.4 - 20
+            outerRadius = innerRadius + 20
+            
+            chord = d3.chordDirected()
+            .sortSubgroups(d3.descending)
+            .sortChords(d3.descending)
+
+            arc = d3.arc()
+            .innerRadius(innerRadius)
+            .outerRadius(outerRadius)
+
+            ribbon = d3.ribbonArrow()
+            .radius(innerRadius - 0.5)
+            // .padAngle(1 / innerRadius)
+
+            formatValue = x => `${x.toFixed(0)}`
+
+            body = d3.select('body')
+            svg = body.append("svg")
+                .attr("viewBox", [-width / 2, -height / 2, width, height])
+                .attr("margin", "20")
+
+            textId = uid("text");
+            console.log(textId)
+        }
+
+        function redraw() {
+            d3.select('svg').remove()
+            svg = body.append("svg")
+                .attr("viewBox", [-width / 2, -height / 2, width, height]);
+            draw()
+        }
+
+        function draw() {
+            svg.style("width", "60vw")
+            .style("height", "60vw")
+            .style("position", "absolute")
+            .style("top", "0")
+            
+            color = d3.scaleOrdinal(names, d3.schemeCategory10)
+            const chords = chord(matrix);
+
+            pa = svg.append("path")
+                .attr("id", textId.id)
+                .attr("fill", "none")
+                .attr("d", d3.arc()({outerRadius, startAngle: 0, endAngle: 2 * Math.PI}));
+
+            g1 = svg.append("g")
+                .attr("fill-opacity", 1.0)
+                .selectAll("g")
+                .data(chords)
+                .join("path")
+                .attr("d", ribbon)
+                .attr("class", "ribbon")
+                // .attr("fill", d => d3.interpolateTurbo(d.target.index/names.length)) 
+                .attr("fill", d => color(names[d.source.index]))
+                .style("mix-blend-mode", "multiply")
+                .append("title")
+                .text(d => `\"${names[d.source.index]}\" -> \"${names[d.target.index]}\": ${formatValue(d.source.value)}`);
+
+            g2 = svg.append("g")
+                .attr("font-family", "sans-serif")
+                .attr("font-size", 15)
+                .selectAll("g")
+                .data(chords.groups)
+                .join("g")
+                .attr("class", "label")
+                .call(g => g.append("path")
+                    .attr("d", arc)
+                    // .attr("fill", d => d3.interpolateTurbo(d.index/names.length)) 
+                    .attr("fill", d => color(names[d.index]))
+                    .attr("stroke", "#fff"))
+                .call(g => g.append("text")
+                    .each(function(d) { d.angle = ((d.startAngle + d.endAngle) / 2);})
+                        .attr("dy", ".25em")
+                        .attr("class", "titles")
+                        // .attr("text-anchor", function(d) { return d.angle > Math.PI ? "end" : null; })
+                        .attr("transform", function(d,i) {
+                            var c = arc.centroid(d);
+                            return "rotate(" + (d.angle * 180 / Math.PI - 90) + ")"
+                            + "translate(" + (innerRadius + 25) + ")" //how close the labels are to the outer arc
+                            // + (d.angle > Math.PI ? "rotate(180)" : "")
+                        })
+                        .text(d => names[d.index])
+                )
+                .call(g => g.append("title")
+                    .text(
+                        d => `\"${names[d.index]}\"\n-> ${formatValue(d3.sum(matrix[d.index]))}\n<- ${formatValue(d3.sum(matrix, row => row[d.index]))}`
+                        )
+                );
+            
+            function get_gif_name(src, tar) {
+                return './data/gif/' + src + '_to_' + tar + '.gif'
+            }
+
+            ribbons = svg.selectAll(".ribbon")
+            ribbons.on('click', e => {
+                let data = e.srcElement.__data__
+                let src = data.source.index
+                let tar = data.target.index
+
+                let src0 = names0.indexOf(names[src])
+                let tar0 = names0.indexOf(names[tar])
+                console.log((src0+1)+'->'+(tar0+1))
+
+                let src2src = get_gif_name(src0, src0)
+                let src2tar = get_gif_name(src0, tar0)
+                let tar2tar = get_gif_name(tar0, tar0)
+
+                $("#s2s").attr("src", src2src)
+                $("#s2s-label")[0].innerHTML = names[src]
+
+                $("#s2t").attr("src", src2tar)
+                $("#s2t-label")[0].innerHTML = names[src] + ' -> ' + names[tar]
+
+                $('#t2t').attr("src", tar2tar)
+                $("#t2t-label")[0].innerHTML = names[tar]
+
+                $("#gif-container").css("visibility", "visible")
+                // console.log(data)
+                ribbons.style("opacity", d => {
+                    let op = [1.0, 0.2]
+                    let tofade = !((d.source.index == src && d.target.index == tar) || (d.source.index == tar && d.target.index == src))
+                    let result = op[Number(tofade)]
+                    return result
+                })
+            })
+
+            labels = svg.selectAll(".label")
+            labels.on('click', e => {
+                let data = e.srcElement.__data__
+                let i = data.index
+                ribbons.style("opacity", d => {
+                    let op = [1.0, 0.2]
+                    let tofade = d.source.index != i && d.target.index != i
+                    let result = op[Number(tofade)]
+                    return result
+                })
+            })
+        }
+	</script>
+</html>
