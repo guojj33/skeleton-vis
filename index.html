@@ -56,10 +56,10 @@
         // current show data
         var names = 0
         var matrix = 0
-        this.axios.get('./data/classname.json').then(
+        this.axios.get('./skeleton-vis/data/classname.json').then(
             res => {
                 names0 = res.data
-                this.axios.get('./data/conf_mat.json').then(
+                this.axios.get('./skeleton-vis/data/conf_mat.json').then(
                     res => {
                         matrix0 = res.data
                         init()
