@@ -2,33 +2,41 @@
 	<head>
         <meta charset="utf-8">
         <title>skeleton-vis</title>
-        <script src = "./lib/jquery.js"></script>
         <script src = "./lib/d3.min.js"></script>
-        <script src = "./lib/paper-full.js "></script>
         <script src = "./lib/axios.min.js"></script>
         <script src = "./lib/jquery-3.6.0.min.js"></script>
         <script src = "./lib/jquery-ui.min.js"></script>
-        <script src = "./lib/numjs.min.js"></script>
-        <script src = "./src/marchingants.js"></script>
         <link rel="stylesheet" href="./css/jquery-ui.min.css">
 	</head>
     <style>
     </style>
 	<body>
-        <div style="position: absolute; right: 0; top: 5; font-size: 14px;">data generated with model <a href="https://gitee.com/yfsong0709/RA-GCNv2">RA-GCNv2</a> testing on <a href="https://rose1.ntu.edu.sg/dataset/actionRecognition/">ntu-rgbd-60</a> dataset</div>
-        <div style="position: absolute; right: 0px; top: 25px; margin: 5px;">
+        <div style="position: absolute; right: 0; top: 5; font-size: 14px; text-align: left;">data generated with model <a href="https://gitee.com/yfsong0709/RA-GCNv2">RA-GCNv2</a> testing on <a href="https://rose1.ntu.edu.sg/dataset/actionRecognition/">ntu-rgbd-60</a> dataset<br>
+        usage:<br>
+        1. click "hide correct" button to enable path filter<br>
+        2. click on one class name to highlight related paths<br>
+        3. click on one path to highlight paths connecting two classes and<br>
+        show skeleton samples<br>
+        4. click "play" to start arrow animation (use the path filter before <br>
+        starting the animation to avoid large computation)<br>
+        </div>
+        <div style="position: absolute; right: 0px; top: 160px; margin: 5px; z-index: 999;">
             <button id="correct-button"></button>
             <button id="reset-button"></button>
+            <button id="play-button"></button>
+            <!-- <button id="pre-button"></button> -->
+            <!-- <button id="next-button"></button> -->
         </div>
-        <div style="position: absolute; right: 0px; top: 50px; margin: 5px; font-size: 15px;">
+        <div style="position: absolute; right: 0px; top: 180px; margin: 5px; font-size: 15px; z-index: 999;">
             <div id="slider-label" style="visibility: visible; margin: 10px;">show path larger than <span id="slider-value">0</span></div>
             <div id="slider" style="width: 200px; visibility: visible;"></div>
         </div>
         <div id="rotate-slider" style="height: 400px;
         position: absolute;
         left: 65vw;
-        top: 100px;"></div>
-        <div id="gif-container" style="position: absolute; right:0; top: 110px; visibility: hidden;">
+        top: 220px;"></div>
+        <!-- <div id="ani-slider" style="position: absolute; right: 0px; top: 180px; width: 200px;"> -->
+        <div id="gif-container" style="position: absolute; right:0; top: 240px; visibility: hidden;">
             <div id="s2s-label"></div>
             <img id="s2s" class="gif" src=""/>
             <div id="s2t-label"></div>
@@ -88,11 +96,9 @@
         
         // after getting names and matrix
         function init() {
-            var a = nj.array([[1,2,3],[4,5,6]])
-            console.log(a)
-
-            console.log(names0)
-            console.log(matrix0)
+            const svgns = "http://www.w3.org/2000/svg";
+            // console.log(names0)
+            // console.log(matrix0)
             names = deepCopy(names0)
             matrix = deepCopy(matrix0)
 
@@ -154,7 +160,7 @@
                 return Math.max(...l)
             }
             // add slider
-            let mat_max = findMax()
+            mat_max = findMax()
             console.log(mat_max)
             function filterWithVAndRedraw(v) {
                 // let req = new FormData()
@@ -171,56 +177,56 @@
                 //         console.log('matrix', matrix)
                 //         console.log(names)
 
-                        let matrixT = deepCopy(matrix0)
-                        let namesT = deepCopy(names0)
-                        let cnum = matrixT.length // class num
-                        let nonZeroCount = new Array(cnum).fill(0)
-                        for (let i = 0; i < cnum; ++i) {
-                            matrixT[i][i] = 0;
-                            for (let j = 0; j < cnum; ++j) {
-                                if (matrixT[i][j] < v) {
-                                    matrixT[i][j] = 0
-                                }
-                                else {
-                                    nonZeroCount[i] += 1
-                                    nonZeroCount[j] += 1
-                                }
+                    let matrixT = deepCopy(matrix0)
+                    let namesT = deepCopy(names0)
+                    let cnum = matrixT.length // class num
+                    let nonZeroCount = new Array(cnum).fill(0)
+                    for (let i = 0; i < cnum; ++i) {
+                        matrixT[i][i] = 0;
+                        for (let j = 0; j < cnum; ++j) {
+                            if (matrixT[i][j] < v) {
+                                matrixT[i][j] = 0
+                            }
+                            else {
+                                nonZeroCount[i] += 1
+                                nonZeroCount[j] += 1
                             }
                         }
-                        let toDelete = []
-                        for (let i = 0; i < cnum; ++i) {
-                            if (nonZeroCount[i] <= 0) {
-                                toDelete.push(i)
-                            }
+                    }
+                    let toDelete = []
+                    for (let i = 0; i < cnum; ++i) {
+                        if (nonZeroCount[i] <= 0) {
+                            toDelete.push(i)
                         }
-                        console.log('todelete', toDelete)
-                        // console.log(toDelete.toString() == del.toString()) // true
-                        for (let i = 0; i < cnum; ++i) {
-                            // delete rows
-                            if (toDelete.indexOf(i) != -1) {
-                                delete matrixT[i]
-                                continue
-                            }
-                            // delete cols
-                            for (let j = 0; j < toDelete.length; ++j) {
-                                delete matrixT[i][toDelete[j]]
-                            }
-                            matrixT[i] = matrixT[i].filter(val => val !== undefined) // filter
+                    }
+                    console.log('todelete', toDelete)
+                    // console.log(toDelete.toString() == del.toString()) // true
+                    for (let i = 0; i < cnum; ++i) {
+                        // delete rows
+                        if (toDelete.indexOf(i) != -1) {
+                            delete matrixT[i]
+                            continue
                         }
-                        matrixT = matrixT.filter(val => val !== undefined) // filter
-                        console.log('matrixT', matrixT)
-                        // console.log(matrix.toString() == matrixT.toString())
-                        for (let i = 0; i < toDelete.length; ++i) {
-                            delete namesT[toDelete[i]]
+                        // delete cols
+                        for (let j = 0; j < toDelete.length; ++j) {
+                            delete matrixT[i][toDelete[j]]
                         }
-                        namesT = namesT.filter(val => val != undefined)
-                        
-                        matrix = matrixT
-                        names = namesT
+                        matrixT[i] = matrixT[i].filter(val => val !== undefined) // filter
+                    }
+                    matrixT = matrixT.filter(val => val !== undefined) // filter
+                    console.log('matrixT', matrixT)
+                    // console.log(matrix.toString() == matrixT.toString())
+                    for (let i = 0; i < toDelete.length; ++i) {
+                        delete namesT[toDelete[i]]
+                    }
+                    namesT = namesT.filter(val => val != undefined)
+                    
+                    matrix = matrixT
+                    names = namesT
 
-                        redraw()
-                    // })
-                    // .catch(printErr)
+                    redraw()
+                // })
+                // .catch(printErr)
             }
             $("#slider").slider({
                 min: 0,
@@ -243,7 +249,7 @@
                 value: 0,
                 orientation: "vertical",
                 slide: function(e, ui) {
-                    console.log('rotate:', ui.value)
+                    // console.log('rotate:', ui.value)
                     svg.attr("transform", "rotate("+ui.value+")")
                 }
             })
@@ -265,31 +271,171 @@
 
             ribbon = d3.ribbonArrow()
             .radius(innerRadius - 0.5)
-            // .padAngle(1 / innerRadius)
+            .padAngle(1 / innerRadius)
+            
+            ribbon2 = d3.ribbonArrow()
+            .radius(innerRadius - 0.5)
+            .padAngle(1 / innerRadius)
 
             formatValue = x => `${x.toFixed(0)}`
 
             body = d3.select('body')
+
             svg = body.append("svg")
-                .attr("viewBox", [-width / 2, -height / 2, width, height])
-                .attr("margin", "20")
+            // canvas = body.append('canvas')
 
             textId = uid("text");
-            console.log(textId)
+            
+            // animation
+            let frames = 500
+            let fps = 60
+            function startAnimation() {
+                let boxes = d3.selectAll(".ribbon-traj-box").nodes()
+                let ribbonPaths = d3.selectAll(".ribbon").nodes()
+                for (let i = 0; i < boxes.length; ++i) {
+                    let e = boxes[i]
+                    e.setAttribute("id", `traj-box-${i}`)
+                    let traj = e.getElementsByClassName("ribbon-traj")[0]
+                    traj.setAttribute("id", "traj-" + i)
+                    let ribbonPath = ribbonPaths[i]
+
+                    let positions = []
+                    let rotateAngles = []
+                    let totalLength = traj.getTotalLength()
+                    // cal positions
+                    let arc = innerRadius * (e.__data__.source.endAngle - e.__data__.source.startAngle)
+                    let value = e.__data__.source.value
+                    for (let f = 0; f < frames; ++f) {
+                        positions.push(traj.getPointAtLength(f*totalLength/frames/2 + arc))
+                    }
+                    // positions[frames-1] = {x: '1000', y: '1000'}
+                    // cal angles
+                    let angle = (e.__data__.source.startAngle + e.__data__.source.endAngle) / 2
+                    angle = angle / Math.PI * 180 + 90
+                    angle %= 360
+                    rotateAngles.push(angle)
+                    console.log(e)
+                    let angleIndex = 1
+                    for (let f = 0; f < frames-1; ++f) {
+                        angle = Math.atan2(positions[f+1].y-positions[f].y, positions[f+1].x-positions[f].x)
+                        angle = angle / Math.PI * 180 + 360
+                        angle %= 360
+
+                        let dif = Math.abs(angle-rotateAngles[angleIndex-1])
+                        // console.log(f, dif)
+                        if (f > frames*3/4 && dif > 30) {
+                            console.log(angleIndex, dif)
+                            angle = rotateAngles[angleIndex-1]
+                        }
+                        rotateAngles.push(angle)
+                        angleIndex += 1
+                    }
+
+                    function issueArrow(arrowIndex, startT) {
+                        // if (i >= 1) break // debug
+                        d3.xml("./svg/arrow.svg")
+                        .then(data => {
+                            let clipP = document.createElementNS(svgns, "clipPath")
+                            clipP.setAttribute("class", "clip")
+                            clipP.setAttribute("id", `clipPath-${i}-${arrowIndex}`)
+                            let bbox = ribbonPath.getBBox()
+                            let rectBox = document.createElementNS(svgns, "g")
+                            rectBox.setAttribute("class", "icon-box")
+                            rectBox.setAttribute("x", bbox.x)
+                            rectBox.setAttribute("y", bbox.y)
+                            rectBox.setAttribute("width", bbox.width)
+                            rectBox.setAttribute("height", bbox.height)
+                            let ribbonPath2 = ribbonPath.cloneNode()
+                            ribbonPath2.setAttribute("style", "")
+                            ribbonPath2.setAttribute("fill", "")
+                            clipP.appendChild(ribbonPath2)
+                            e.appendChild(clipP)
+                            rectBox.setAttribute("clip-path", `url(#clipPath-${i}-${arrowIndex})`) //
+                            e.append(rectBox)
+                            
+                            let poly = data.documentElement.getElementsByTagName("polygon")[0]
+                            let cc = `icon-${i}-${arrowIndex}`
+                            poly.setAttribute("id", cc)
+
+                            // start animation
+
+                            poly.setAttribute("fill", "white")
+                            rectBox.append(poly)
+                            let scaleRatio = arc //4
+                            let height = poly.getBBox().height
+                            let width = poly.getBBox().width
+                            // poly.setAttribute("mask", `url(#mask-${i})`)
+                            let curT = startT
+                            function aniFunc() {
+                                poly.setAttribute("visibility", "visible")
+                                curT %= frames
+                                angle = rotateAngles[curT]
+                                pos = positions[curT]
+
+                                let scaleR = scaleRatio*(Math.pow(curT-frames/2, 2)/Math.pow(frames/2, 2) + 0.2)
+                                let transform = `transform: translate(${pos.x}px, ${pos.y}px) rotate(${angle}deg) scale(0.5, 1) scale(${scaleR}, ${scaleR}) translate(0px, -${height/2}px); opacity: 0.5`
+                                poly.setAttribute("style", transform)
+                                
+                                curT += Math.floor(1+1*value/mat_max)
+                            }
+                            aniFunc()
+                            // let b3 = document.getElementById("next-button")
+                            // b3.innerHTML = "next"
+                            // b3.remove()
+                            // b3.addEventListener("click", aniFunc)
+                            setInterval(aniFunc, 1/fps*1000)
+                        })
+                    }
+
+                    // issueArrow(0, 0)
+                    let arrowCount = 5
+                    for (let i = 0; i < arrowCount; ++i) {
+                        issueArrow(i, frames/arrowCount*i)
+                    }
+                }
+            }
+            function clearAnimation() {
+                d3.selectAll(".icon-box").remove()
+                d3.selectAll(".clip").remove()
+            }
+            b2 = document.getElementById('play-button')
+            b2.innerHTML = 'play'
+            b2.addEventListener('click', function() {
+                b2.setAttribute("disabled", "true")
+                if (b2.innerHTML == 'play') {
+                    startAnimation()
+                    b2.innerHTML = 'stop'
+                    isPlaying = true
+                }
+                else {
+                    clearAnimation()
+                    b2.innerHTML = 'play'
+                    isPlaying = false
+                }
+                b2.removeAttribute("disabled")
+            })
         }
 
         function redraw() {
+            document.getElementById('play-button').innerHTML = 'play'
+            // b2.click()
             d3.select('svg').remove()
-            svg = body.append("svg")
-                .attr("viewBox", [-width / 2, -height / 2, width, height]);
+            // d3.select('canvas').remove()
+
+            svg = body.append("svg").style("overflow", "auto")
+            // canvas = body.append('canvas')
+            
             draw()
         }
 
         function draw() {
-            svg.style("width", "60vw")
+            svg.attr("viewBox", [-width / 2, -height / 2, width, height])
+            .attr("id", "svg-box")
+            .style("width", "60vw")
             .style("height", "60vw")
             .style("position", "absolute")
             .style("top", "0")
+            .style("left", "0")
             
             color = d3.scaleOrdinal(names, d3.schemeCategory10)
             const chords = chord(matrix);
@@ -299,6 +445,7 @@
                 .attr("fill", "none")
                 .attr("d", d3.arc()({outerRadius, startAngle: 0, endAngle: 2 * Math.PI}));
 
+            console.log(chords)
             g1 = svg.append("g")
                 .attr("fill-opacity", 1.0)
                 .selectAll("g")
@@ -311,6 +458,49 @@
                 .style("mix-blend-mode", "multiply")
                 .append("title")
                 .text(d => `\"${names[d.source.index]}\" -> \"${names[d.target.index]}\": ${formatValue(d.source.value)}`);
+
+
+            let ribbonPaths = document.getElementsByClassName("ribbon")
+            for (let i = 0; i < ribbonPaths.length; ++i) {
+                ribbonPaths[i].setAttribute("id", "ribbon-" + i)
+            }
+
+            for (let i = 0; i < chords.length; ++i) {
+                let ratio = 0.01
+                let source = chords[i].source
+                let srcMid = (source.startAngle + source.endAngle) / 2
+                let srcDif = (source.endAngle - source.startAngle) / 2
+                let srcWidth = srcDif * ratio
+                source.startAngle = srcMid - srcWidth
+                source.endAngle = srcMid + srcWidth
+
+                let target = chords[i].target
+                let tarMid = (target.startAngle + target.endAngle) / 2
+                let tarDif = (target.endAngle - target.startAngle) / 2
+                let tarWidth = tarDif * ratio
+                target.startAngle = tarMid - tarWidth
+                target.endAngle = tarMid + tarWidth
+            }
+            console.log(chords)
+
+            g11 = svg.append("g")
+                .attr("fill-opacity", 1.0)
+                .selectAll("g")
+                .data(chords)
+                .join("g")
+                .attr("class", "ribbon-traj-box")
+                .call(g => {
+                        g.append("path")
+                        .attr("class", "ribbon-traj")
+                        .attr("d", ribbon2)
+                        .attr("fill", d => color(names[d.source.index]))
+                        .style("mix-blend-mode", "multiply")
+                        // g.each(d => {
+                        //     console.log(this)
+                        //     console.log(d)
+                        // })
+                    }
+                )
 
             g2 = svg.append("g")
                 .attr("font-family", "sans-serif")
@@ -341,7 +531,7 @@
                     .text(
                         d => `\"${names[d.index]}\"\n-> ${formatValue(d3.sum(matrix[d.index]))}\n<- ${formatValue(d3.sum(matrix, row => row[d.index]))}`
                         )
-                );
+                );            
             
             function get_gif_name(src, tar) {
                 return './data/gif/' + src + '_to_' + tar + '.gif'
@@ -391,6 +581,15 @@
                     return result
                 })
             })
+
+            // let s = $("#svg-box")[0].getBoundingClientRect()
+            // canvas.attr("id", "canvas-box")
+            // .attr("width", s.width)
+            // .attr("height", s.height)
+            // .style("position", "absolute")
+            // .style("left", "0")
+            // .style("top", "0")
+            // .style("z-index", "-1")
         }
 	</script>
 </html>
