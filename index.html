@@ -287,7 +287,7 @@
             textId = uid("text");
             
             // animation
-            let frames = 500
+            let frames = 520
             let fps = 60
             function startAnimation() {
                 let boxes = d3.selectAll(".ribbon-traj-box").nodes()
@@ -376,7 +376,7 @@
                                 let transform = `transform: translate(${pos.x}px, ${pos.y}px) rotate(${angle}deg) scale(0.5, 1) scale(${scaleR}, ${scaleR}) translate(0px, -${height/2}px); opacity: 0.5`
                                 poly.setAttribute("style", transform)
                                 
-                                curT += Math.floor(1+1*value/mat_max)
+                                curT += Math.floor(1+2*value/mat_max)
                             }
                             aniFunc()
                             // let b3 = document.getElementById("next-button")
@@ -388,7 +388,7 @@
                     }
 
                     // issueArrow(0, 0)
-                    let arrowCount = 5
+                    let arrowCount = 8
                     for (let i = 0; i < arrowCount; ++i) {
                         issueArrow(i, frames/arrowCount*i)
                     }
